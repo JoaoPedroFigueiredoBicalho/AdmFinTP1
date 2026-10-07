@@ -66,10 +66,10 @@ No macOS/Linux:
 source .venv/bin/activate
 ```
 
-4. Instale as dependências:
+4. Instale as dependências usando o arquivo de requisitos:
 
 ```bash
-pip install matplotlib reportlab
+pip install -r requirements.txt
 ```
 
 ## Execução
