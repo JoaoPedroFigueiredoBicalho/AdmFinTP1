@@ -3,7 +3,7 @@
 #
 # Versão com:
 # - Interface gráfica
-# - Cálculo de VPL, ganho nominal, retorno, TIR e payback
+# - Cálculo de VPL, ganho nominal, retorno, TIR, IL e payback
 # - Gráfico comparativo dentro da interface
 # - Geração de relatório em PDF
 # ============================================================
@@ -148,6 +148,21 @@ def calcular_tir(investimento_inicial, fluxos):
             return (limite_inferior + limite_superior) / 2
 
     return (limite_inferior + limite_superior) / 2
+
+
+def calcular_il(investimento_inicial, fluxos, taxa):
+    """Calcula o Índice de Lucratividade (IL)."""
+
+    if investimento_inicial <= 0:
+        return None
+
+    valor_presente_fluxos = sum(
+        fluxo / ((1 + taxa) ** periodo)
+        for periodo, fluxo in enumerate(fluxos, start=1)
+    )
+
+    return valor_presente_fluxos / investimento_inicial
+
 
 def gerar_grafico_linhas(investimentos):
     """
@@ -573,6 +588,7 @@ class InvestCompareApp:
             "ganho",
             "retorno",
             "tir",
+            "il",
             "payback"
         )
 
@@ -591,17 +607,19 @@ class InvestCompareApp:
             "ganho": "Ganho nominal",
             "retorno": "Retorno",
             "tir": "TIR",
+            "il": "IL",
             "payback": "Payback"
         }
 
         larguras = {
-            "nome": 170,
-            "inicial": 150,
-            "vpl": 150,
-            "ganho": 150,
-            "retorno": 100,
-            "tir": 100,
-            "payback": 110
+            "nome": 150,
+            "inicial": 130,
+            "vpl": 130,
+            "ganho": 130,
+            "retorno": 90,
+            "tir": 90,
+            "il": 90,
+            "payback": 90
         }
 
         for coluna in colunas:
@@ -678,11 +696,12 @@ class InvestCompareApp:
         self.grafico_frame = grafico_frame
 
         self.figure = plt.Figure(
-            figsize=(8, 3.2),
+            figsize=(8, 6),
             dpi=90
         )
 
-        self.ax = self.figure.add_subplot(111)
+        self.ax = self.figure.add_subplot(211)
+        self.ax_il = self.figure.add_subplot(212)
 
         self.ax.set_title(
             "VPL dos investimentos"
@@ -699,6 +718,23 @@ class InvestCompareApp:
             ha="center",
             va="center",
             transform=self.ax.transAxes
+        )
+
+        self.ax_il.set_title(
+            "Índice de Lucratividade (IL)"
+        )
+
+        self.ax_il.set_ylabel(
+            "IL"
+        )
+
+        self.ax_il.text(
+            0.5,
+            0.5,
+            "Cadastre investimentos para visualizar o gráfico.",
+            ha="center",
+            va="center",
+            transform=self.ax_il.transAxes
         )
 
         self.canvas = FigureCanvasTkAgg(
@@ -844,6 +880,11 @@ class InvestCompareApp:
                     investimento_inicial,
                     fluxos
                 ),
+                "il": calcular_il(
+                    investimento_inicial,
+                    fluxos,
+                    taxa
+                ),
                 "payback": calcular_payback(
                     investimento_inicial,
                     fluxos
@@ -888,6 +929,11 @@ class InvestCompareApp:
                     f"{investimento['tir'] * 100:.2f}%"
                 )
 
+            if investimento["il"] is None:
+                il = "N/A"
+            else:
+                il = f"{investimento['il']:.2f}"
+
             if investimento["payback"] is None:
                 payback = "Não recuperado"
             else:
@@ -911,6 +957,7 @@ class InvestCompareApp:
                     ),
                     f"{investimento['retorno']:.2f}%",
                     tir,
+                    il,
                     payback
                 )
             )
@@ -922,6 +969,7 @@ class InvestCompareApp:
     def atualizar_grafico(self):
 
         self.ax.clear()
+        self.ax_il.clear()
 
         if not self.investimentos:
 
@@ -938,6 +986,19 @@ class InvestCompareApp:
                 transform=self.ax.transAxes
             )
 
+            self.ax_il.set_title(
+                "Índice de Lucratividade (IL)"
+            )
+
+            self.ax_il.text(
+                0.5,
+                0.5,
+                "Cadastre investimentos para visualizar o gráfico.",
+                ha="center",
+                va="center",
+                transform=self.ax_il.transAxes
+            )
+
             self.canvas.draw()
 
             return
@@ -949,6 +1010,13 @@ class InvestCompareApp:
 
         vpl = [
             investimento["vpl"]
+            for investimento in self.investimentos
+        ]
+
+        il = [
+            investimento["il"]
+            if investimento["il"] is not None
+            else 0
             for investimento in self.investimentos
         ]
 
@@ -971,6 +1039,31 @@ class InvestCompareApp:
         )
 
         self.ax.tick_params(
+            axis="x",
+            rotation=25
+        )
+
+        self.ax_il.bar(
+            nomes,
+            il
+        )
+
+        self.ax_il.axhline(
+            1,
+            color="red",
+            linestyle="--",
+            linewidth=1
+        )
+
+        self.ax_il.set_title(
+            "Índice de Lucratividade (IL)"
+        )
+
+        self.ax_il.set_ylabel(
+            "IL"
+        )
+
+        self.ax_il.tick_params(
             axis="x",
             rotation=25
         )
@@ -1005,6 +1098,11 @@ class InvestCompareApp:
             if melhor["tir"] is not None
             else "TIR: não identificada\n"
         )
+        il_texto = (
+            f"IL: {melhor['il']:.2f}\n"
+            if melhor["il"] is not None
+            else "IL: não calculado\n"
+        )
 
         if melhor["vpl"] > 0:
 
@@ -1012,7 +1110,8 @@ class InvestCompareApp:
                 f"Melhor investimento: {melhor['nome']}\n\n"
                 f"VPL: {dinheiro(melhor['vpl'])}\n"
                 f"Retorno: {melhor['retorno']:.2f}%\n"
-                f"{tir_texto}\n"
+                f"{tir_texto}"
+                f"{il_texto}\n"
                 "Recomendação: investimento atrativo "
                 "pelo critério do VPL."
             )
@@ -1022,7 +1121,8 @@ class InvestCompareApp:
             texto = (
                 f"Melhor investimento: {melhor['nome']}\n\n"
                 f"VPL: {dinheiro(melhor['vpl'])}\n"
-                f"{tir_texto}\n"
+                f"{tir_texto}"
+                f"{il_texto}\n"
                 "Recomendação: investimento indiferente "
                 "pelo critério do VPL."
             )
@@ -1033,7 +1133,8 @@ class InvestCompareApp:
                 f"Maior VPL entre as alternativas: "
                 f"{melhor['nome']}\n\n"
                 f"VPL: {dinheiro(melhor['vpl'])}\n"
-                f"{tir_texto}\n"
+                f"{tir_texto}"
+                f"{il_texto}\n"
                 "Atenção: o VPL é negativo."
             )
 
@@ -1215,6 +1316,7 @@ class InvestCompareApp:
                     "Ganho",
                     "Retorno",
                     "TIR",
+                    "IL",
                     "Payback"
                 ]
             ]
@@ -1224,6 +1326,12 @@ class InvestCompareApp:
                 tir = (
                     f"{investimento['tir'] * 100:.2f}%"
                     if investimento["tir"] is not None
+                    else "N/A"
+                )
+
+                il = (
+                    f"{investimento['il']:.2f}"
+                    if investimento["il"] is not None
                     else "N/A"
                 )
 
@@ -1247,6 +1355,7 @@ class InvestCompareApp:
                         ),
                         f"{investimento['retorno']:.2f}%",
                         tir,
+                        il,
                         payback
                     ]
                 )
@@ -1255,13 +1364,14 @@ class InvestCompareApp:
                 dados,
                 repeatRows=1,
                 colWidths=[
-                    76,
-                    60,
-                    60,
-                    60,
-                    48,
-                    46,
-                    52
+                    68,
+                    52,
+                    52,
+                    52,
+                    42,
+                    40,
+                    34,
+                    44
                 ]
             )
 

@@ -9,7 +9,7 @@ O sistema foi desenvolvido para auxiliar na análise de alternativas de investim
 - cadastre múltiplos investimentos;
 - informe investimento inicial, taxa de desconto e fluxo de caixa;
 - compare as opções pelo critério do VPL;
-- avalie a taxa interna de retorno (TIR) de cada investimento;
+- avalie a taxa interna de retorno (TIR) e o índice de lucratividade (IL) de cada investimento;
 - visualize os resultados em uma tabela e em gráfico;
 - gere um relatório em PDF para documentação ou apresentação.
 
@@ -21,6 +21,7 @@ O sistema foi desenvolvido para auxiliar na análise de alternativas de investim
   - ganho nominal;
   - retorno percentual;
   - Taxa Interna de Retorno (TIR);
+  - Índice de Lucratividade (IL);
   - payback simples;
 - Comparação automática da melhor alternativa;
 - Exibição dos dados em tabela dentro da interface;
