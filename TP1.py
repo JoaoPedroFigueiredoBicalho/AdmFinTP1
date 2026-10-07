@@ -3,7 +3,7 @@
 #
 # Versão com:
 # - Interface gráfica
-# - Cálculo de VPL, ganho nominal, retorno e payback
+# - Cálculo de VPL, ganho nominal, retorno, TIR e payback
 # - Gráfico comparativo dentro da interface
 # - Geração de relatório em PDF
 # ============================================================
@@ -89,6 +89,65 @@ def calcular_payback(investimento_inicial, fluxos):
             return (periodo - 1) + fracao
 
     return None
+
+
+def calcular_tir(investimento_inicial, fluxos):
+    """Calcula a Taxa Interna de Retorno (TIR)."""
+
+    if not fluxos:
+        return None
+
+    def npv(taxa):
+        return sum(
+            fluxo / ((1 + taxa) ** periodo)
+            for periodo, fluxo in enumerate(fluxos, start=1)
+        ) - investimento_inicial
+
+    if npv(0) == 0:
+        return 0
+
+    limite_inferior = -0.9999
+    limite_superior = 0.0
+    valor_inferior = npv(limite_inferior)
+    valor_superior = npv(limite_superior)
+
+    if valor_inferior == 0:
+        return limite_inferior
+    if valor_superior == 0:
+        return limite_superior
+
+    if valor_inferior * valor_superior > 0:
+        limite_superior = 0.5
+        valor_superior = npv(limite_superior)
+
+        if valor_inferior * valor_superior > 0:
+            for tentativa in range(1, 101):
+                limite_superior = 2 ** tentativa
+                valor_superior = npv(limite_superior)
+
+                if valor_inferior * valor_superior <= 0:
+                    break
+            else:
+                return None
+
+    for _ in range(200):
+        ponto_medio = (limite_inferior + limite_superior) / 2
+        valor_medio = npv(ponto_medio)
+
+        if abs(valor_medio) < 1e-10:
+            return ponto_medio
+
+        if valor_inferior * valor_medio <= 0:
+            limite_superior = ponto_medio
+            valor_superior = valor_medio
+        else:
+            limite_inferior = ponto_medio
+            valor_inferior = valor_medio
+
+        if abs(limite_superior - limite_inferior) < 1e-12:
+            return (limite_inferior + limite_superior) / 2
+
+    return (limite_inferior + limite_superior) / 2
 
 def gerar_grafico_linhas(investimentos):
     """
@@ -513,6 +572,7 @@ class InvestCompareApp:
             "vpl",
             "ganho",
             "retorno",
+            "tir",
             "payback"
         )
 
@@ -530,16 +590,18 @@ class InvestCompareApp:
             "vpl": "VPL",
             "ganho": "Ganho nominal",
             "retorno": "Retorno",
+            "tir": "TIR",
             "payback": "Payback"
         }
 
         larguras = {
-            "nome": 190,
-            "inicial": 160,
-            "vpl": 160,
-            "ganho": 160,
-            "retorno": 110,
-            "payback": 120
+            "nome": 170,
+            "inicial": 150,
+            "vpl": 150,
+            "ganho": 150,
+            "retorno": 100,
+            "tir": 100,
+            "payback": 110
         }
 
         for coluna in colunas:
@@ -778,6 +840,10 @@ class InvestCompareApp:
                     investimento_inicial,
                     fluxos
                 ),
+                "tir": calcular_tir(
+                    investimento_inicial,
+                    fluxos
+                ),
                 "payback": calcular_payback(
                     investimento_inicial,
                     fluxos
@@ -815,6 +881,13 @@ class InvestCompareApp:
 
         for investimento in self.investimentos:
 
+            if investimento["tir"] is None:
+                tir = "N/A"
+            else:
+                tir = (
+                    f"{investimento['tir'] * 100:.2f}%"
+                )
+
             if investimento["payback"] is None:
                 payback = "Não recuperado"
             else:
@@ -837,6 +910,7 @@ class InvestCompareApp:
                         investimento["ganho"]
                     ),
                     f"{investimento['retorno']:.2f}%",
+                    tir,
                     payback
                 )
             )
@@ -926,12 +1000,19 @@ class InvestCompareApp:
             investimento["vpl"]
         )
 
+        tir_texto = (
+            f"TIR: {melhor['tir'] * 100:.2f}%\n"
+            if melhor["tir"] is not None
+            else "TIR: não identificada\n"
+        )
+
         if melhor["vpl"] > 0:
 
             texto = (
                 f"Melhor investimento: {melhor['nome']}\n\n"
                 f"VPL: {dinheiro(melhor['vpl'])}\n"
-                f"Retorno: {melhor['retorno']:.2f}%\n\n"
+                f"Retorno: {melhor['retorno']:.2f}%\n"
+                f"{tir_texto}\n"
                 "Recomendação: investimento atrativo "
                 "pelo critério do VPL."
             )
@@ -940,7 +1021,8 @@ class InvestCompareApp:
 
             texto = (
                 f"Melhor investimento: {melhor['nome']}\n\n"
-                f"VPL: {dinheiro(melhor['vpl'])}\n\n"
+                f"VPL: {dinheiro(melhor['vpl'])}\n"
+                f"{tir_texto}\n"
                 "Recomendação: investimento indiferente "
                 "pelo critério do VPL."
             )
@@ -950,7 +1032,8 @@ class InvestCompareApp:
             texto = (
                 f"Maior VPL entre as alternativas: "
                 f"{melhor['nome']}\n\n"
-                f"VPL: {dinheiro(melhor['vpl'])}\n\n"
+                f"VPL: {dinheiro(melhor['vpl'])}\n"
+                f"{tir_texto}\n"
                 "Atenção: o VPL é negativo."
             )
 
@@ -1131,11 +1214,18 @@ class InvestCompareApp:
                     "VPL",
                     "Ganho",
                     "Retorno",
+                    "TIR",
                     "Payback"
                 ]
             ]
 
             for investimento in self.investimentos:
+
+                tir = (
+                    f"{investimento['tir'] * 100:.2f}%"
+                    if investimento["tir"] is not None
+                    else "N/A"
+                )
 
                 payback = (
                     f"{investimento['payback']:.2f}"
@@ -1156,6 +1246,7 @@ class InvestCompareApp:
                             investimento["ganho"]
                         ),
                         f"{investimento['retorno']:.2f}%",
+                        tir,
                         payback
                     ]
                 )
@@ -1164,12 +1255,13 @@ class InvestCompareApp:
                 dados,
                 repeatRows=1,
                 colWidths=[
-                    90,
-                    75,
-                    75,
-                    75,
+                    76,
                     60,
-                    65
+                    60,
+                    60,
+                    48,
+                    46,
+                    52
                 ]
             )
 
